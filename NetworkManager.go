@@ -207,7 +207,7 @@ type NetworkManager interface {
 	//GetPropertyGlobalDnsConfiguration() []interface{}
 
 	Subscribe() <-chan *dbus.Signal
-	Unsubscribe()
+	Unsubscribe(s chan *dbus.Signal)
 
 	MarshalJSON() ([]byte, error)
 }
@@ -219,8 +219,6 @@ func NewNetworkManager() (NetworkManager, error) {
 
 type networkManager struct {
 	dbusBase
-
-	sigChan chan *dbus.Signal
 }
 
 func (nm *networkManager) Reload(flags uint32) error {
@@ -554,20 +552,16 @@ func (nm *networkManager) GetPropertyConnectivityCheckEnabled() (bool, error) {
 }
 
 func (nm *networkManager) Subscribe() <-chan *dbus.Signal {
-	if nm.sigChan != nil {
-		return nm.sigChan
-	}
 
 	nm.subscribeNamespace(NetworkManagerObjectPath)
-	nm.sigChan = make(chan *dbus.Signal, 10)
-	nm.conn.Signal(nm.sigChan)
+	sigChan := make(chan *dbus.Signal, 10)
+	nm.conn.Signal(sigChan)
 
-	return nm.sigChan
+	return sigChan
 }
 
-func (nm *networkManager) Unsubscribe() {
-	nm.conn.RemoveSignal(nm.sigChan)
-	nm.sigChan = nil
+func (nm *networkManager) Unsubscribe(c chan *dbus.Signal) {
+	nm.conn.RemoveSignal(c)
 }
 
 func (nm *networkManager) MarshalJSON() ([]byte, error) {
