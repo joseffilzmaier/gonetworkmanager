@@ -206,10 +206,27 @@ type NetworkManager interface {
 	// Dictionary of global DNS settings where the key is one of "searches", "options" and "domains". The values for the "searches" and "options" keys are string arrays describing the list of search domains and resolver options, respectively. The value of the "domains" key is a second-level dictionary, where each key is a domain name, and each key's value is a third-level dictionary with the keys "servers" and "options". "servers" is a string array of DNS servers, "options" is a string array of domain-specific options.
 	//GetPropertyGlobalDnsConfiguration() []interface{}
 
-	Subscribe() <-chan *dbus.Signal
-	Unsubscribe(s chan *dbus.Signal)
+	Subscribe() Subscription
 
 	MarshalJSON() ([]byte, error)
+}
+
+type Subscription interface {
+	Unsubscribe()
+	WaitNext() *dbus.Signal
+}
+
+type subscription struct {
+	c    chan *dbus.Signal
+	conn *dbus.Conn
+}
+
+func (s *subscription) Unsubscribe() {
+	s.conn.RemoveSignal(s.c)
+}
+
+func (s *subscription) WaitNext() *dbus.Signal {
+	return <-s.c
 }
 
 func NewNetworkManager() (NetworkManager, error) {
@@ -551,13 +568,16 @@ func (nm *networkManager) GetPropertyConnectivityCheckEnabled() (bool, error) {
 	return nm.getBoolProperty(NetworkManagerPropertyConnectivityCheckEnabled)
 }
 
-func (nm *networkManager) Subscribe() <-chan *dbus.Signal {
+func (nm *networkManager) Subscribe() Subscription {
 
 	nm.subscribeNamespace(NetworkManagerObjectPath)
 	sigChan := make(chan *dbus.Signal, 10)
 	nm.conn.Signal(sigChan)
 
-	return sigChan
+	return &subscription{
+		c:    sigChan,
+		conn: nm.conn,
+	}
 }
 
 func (nm *networkManager) Unsubscribe(c chan *dbus.Signal) {
