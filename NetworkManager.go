@@ -213,7 +213,7 @@ type NetworkManager interface {
 
 type Subscription interface {
 	Unsubscribe()
-	WaitNext() *dbus.Signal
+	Channel() <-chan *dbus.Signal
 }
 
 type subscription struct {
@@ -225,8 +225,8 @@ func (s *subscription) Unsubscribe() {
 	s.conn.RemoveSignal(s.c)
 }
 
-func (s *subscription) WaitNext() *dbus.Signal {
-	return <-s.c
+func (s *subscription) Channel() <-chan *dbus.Signal {
+	return s.c
 }
 
 func NewNetworkManager() (NetworkManager, error) {
